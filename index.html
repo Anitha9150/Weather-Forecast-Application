@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecast Application</title>
+    <link href="dist/output.css" rel="stylesheet">
+    <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div class="bg-blue-200 p-6">
+
+     <header class="text-black bg-blue-500 w-full flex justify-center">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl p-4">Weather Dashboard</h1>
+    </header>
+    <main class ="p-4">
+            <form id="location-form" class="space-y-4 bg-blue-200 p-6 rounded-lg shadow-md max-w-md mx-auto">
+                <label for="location" class="block text-lg font-semibold text-gray-700">Enter a City Name</label>
+                <input type="text" id="location"placeholder="E.g.,Chennai,Tamil Nadu,India" class ="w-full p-2 mb-4"><br><br>
+                <button type="submit" class ="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded ">Search</button><br><br>
+                <div class="flex items-center justify-center space-x-4 my-4">
+                    <div class="border-t-2 border-dotted border-gray-600"style="width: 40%; border-top-width: 4px !important;"></div> 
+                    <span class="mx-4 text-lg text-gray-700">or</span>
+                    <div class="border-t-2 border-dotted border-gray-600" style="width: 40%; border-top-width: 4px !important;"></div>
+                </div>
+                <button type="button"id ="current-location" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Current Location</button>
+            </form>
+        </div>
+                <!-- Dropdown for Recently Searched Cities -->
+            <div class="relative inline-block w-full">
+                <button class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onclick="toggleDropdown()"></button>
+                  <ul id="recent-searches-dropdown" class="absolute hidden bg-white border border-gray-200 w-full rounded mt-2 overflow-hidden">
+                <!-- Dynamically added city list items will go here -->
+                  </ul>
+            </div>
+        
+
+            <!-- Weather Data Output -->
+            <div id="weather-data" class="mt-4 bg-blue-500 p-4 rounded-lg shadow-md"></div>
+        
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6">
+            <!-- Extended Forecast -->
+            <div id="extended-forecast" class="bg-blue-500 p-6 shadow rounded-lg"></div>
+        </main>
+    </div>
+    
+        <script>
+              const apiEndpoint = 'https://api.openweathermap.org/data/2.5/';
+              const apiKey = '535cdc8d46de87644838d42dbedba9aa'; 
+
+
+            const locationForm = document.getElementById("location-form");
+            const locationInput = document.getElementById("location");
+            const currentLocationButton = document.getElementById("current-location");
+            const recentSearchesDiv = document.getElementById("recent-searches");
+            const weatherDataDiv = document.getElementById("weather-data");
+            const extendedForecastDiv =document.getElementById("extended-forecast");
+
+
+            //Event listeners
+            locationForm.addEventListener("submit",searchLocation);
+            currentLocationButton.addEventListener("click",getCurrentLocation);
+            const recentSearchesKey = "recentSearches"; // Key for local storage
+            const maxRecentCities = 5; // Limit to last 5 cities
+
+       // Save the city to local storage
+            function saveCityToRecentSearches(city) {
+            let recentCities = JSON.parse(localStorage.getItem(recentSearchesKey)) || [];
+    
+    // Add city only if it's not already in the list
+    if (!recentCities.includes(city)) {
+        recentCities.unshift(city); // Add to the start of the array
+    }
+    
+    // Limit to max recent cities
+    if (recentCities.length > maxRecentCities) {
+        recentCities.pop(); // Remove the oldest search
+    }
+    
+    localStorage.setItem(recentSearchesKey, JSON.stringify(recentCities));
+    populateRecentSearchesDropdown(); // Update the dropdown
+}
+
+// Populate the dropdown with recent cities
+function populateRecentSearchesDropdown() {
+    const dropdown = document.getElementById("recent-searches-dropdown");
+    dropdown.innerHTML = ""; // Clear existing items
+    
+    const recentCities = JSON.parse(localStorage.getItem(recentSearchesKey)) || [];
+    
+    // Add each recent city as a dropdown item
+    recentCities.forEach(city => {
+        const listItem = document.createElement("li");
+        listItem.classList.add("px-4", "py-2", "cursor-pointer", "hover:bg-gray-200");
+        listItem.textContent = city;
+        
+        // On click, fetch and display the weather data for the clicked city
+        listItem.onclick = () => {
+            locationInput.value = city; // Set the input to the clicked city
+            fetchWeatherData(city); // Fetch and display weather for this city
+        };
+        
+        dropdown.appendChild(listItem);
+    });
+}
+
+// Toggle dropdown visibility
+function toggleDropdown() {
+    const dropdown = document.getElementById("recent-searches-dropdown");
+    dropdown.classList.toggle("hidden");
+}
+
+// Call this function after every city search
+function handleCitySearch(city) {
+    saveCityToRecentSearches(city); // Save the city to recent searches
+    fetchWeatherData(city); // Fetch weather data for the searched city
+}
+
+// Call `populateRecentSearchesDropdown()` when the page loads to show saved cities
+window.onload = populateRecentSearchesDropdown;
+function validateInput(location) {
+    // Check if the input is empty
+    if (!location) {
+        weatherDataDiv.innerHTML = "<p class='text-red-600'>Please enter a city name.</p>";
+        return false;
+    }
+
+    // Use a regular expression to allow only letters, spaces, and commas
+    const validInput = /^[a-zA-Z\s,]+$/;
+    if (!validInput.test(location)) {
+        weatherDataDiv.innerHTML = "<p class='text-red-600'>Invalid characters in the city name. Please enter letters only.</p>";
+        return false;
+    }
+
+    return true; // Input is valid
+}
+
+              //Search location by city name
+            function searchLocation(e) {
+                e.preventDefault();
+                const location = locationInput.value.trim();
+                if(validateInput(location)) {
+                    handleCitySearch(location);
+                }else {
+                  weatherDataDiv.innerHTML = "<p>Please enter a valid city name.</p>";
+                }
+            }
+
+            //Search location by current geolocation
+            function getCurrentLocation() {
+              navigator.geolocation.getCurrentPosition((position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                fetchWeatherDataByCoords(lat,lon);
+            }, (error) => {
+                console.error(error);
+                weatherDataDiv.innerHTML = "<p>Unable to retrieve current location. Please try again.</p>";
+            });
+        }
+
+        //Fetch weather data by city name
+        function fetchWeatherData(location){
+             weatherDataDiv.innerHTML = "<p>Loading weather data...</p>"; 
+
+            fetch(`${apiEndpoint}weather?q=${location}&units=metric&appid=${apiKey}`)
+               .then(response =>response.json())
+               .then(data => {
+                 if (data.cod === 200) {  
+                        displayWeatherData(data);
+                        displayExtendedForecast(data.coord.lat, data.coord.lon); // Display extended forecast
+                    } else {
+                        console.error("Error:",data.message);
+                        weatherDataDiv.innerHTML =`<p>Error: ${data.message}</p>`;
+                    }
+                })
+                .catch(error => {
+                    console.error("API Fetch Error:", error);           
+                    weatherDataDiv.innerHTML =`<p>Error: ${data.message}</p>`; 
+                });
+        }    
+
+        //Fetch weather data by coordinates
+        function fetchWeatherDataByCoords(lat,lon) {
+            weatherDataDiv.innerHTML = "<p>Loading weather data...</p>";
+           
+            fetch(`${apiEndpoint}weather?q=${location}&units=metric&appid=${apiKey}`)
+                .then(response=>response.json())
+                .then(data => {
+                    if (data.cod === 200) {
+                       displayWeatherData(data);
+                       displayExtendedForecast(lat, lon);
+                    } else {
+                        console.error("Error: Data is missing sys property", data);
+                        weatherDataDiv.innerHTML = "<p>Unable to fetch weather data. Please try again later.</p>";
+                    }
+                })
+                .catch(error => {
+                      console.error("API Fetch Error:", error);
+                      weatherDataDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+        });
+    }
+        // Display weather data function
+          function displayWeatherData(data) {
+            let iconClass;
+            switch (data.weather[0].main) {
+                case "Clear":
+                   iconClass = "fas fa-sun"; // Sun icon for clear weather
+                   break;
+                case "Rain":
+                   iconClass = "fas fa-cloud-showers-heavy"; // Rain icon
+                   break;
+                case "Clouds":
+                   iconClass = "fas fa-cloud"; // Cloud icon
+                   break;
+                case "Snow":
+                   iconClass = "fas fa-snowflake"; // Snow icon
+                   break;
+                default:
+                   iconClass = "fas fa-cloud"; // Default icon
+                   break;
+            }
+
+            const weatherHTML = `
+            <div class="bg-blue-100 text-blue-900 p-4 rounded-lg shadow-lg">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+        
+            <!--Weather Icon (on the left)-->
+                <div class="text-left sm:w-2/3">
+                    <h2 class="text-xl font-bold">${data.name}, ${data.sys ? data.sys.country : 'Unknown Country'}</h2>
+                    <p>Weather: ${data.weather[0].description}</p>
+                    <p>Temperature: ${data.main.temp}°C</p>
+                    <p>Humidity: ${data.main.humidity}%</p>
+                </div>
+                
+                <!-- Weather Icon (on the right) -->
+                <div class="text-right sm:w-1/3">
+                    <i class="${iconClass} text-5xl text-yellow-400"></i>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Insert the weather HTML into the weather data container
+    weatherDataDiv.innerHTML = weatherHTML;
+}
+    
+        // Display extended forecast
+        function displayExtendedForecast(lat, lon) {
+            fetch(`${apiEndpoint}forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    const forecastHTML = `
+                        <h2 class="text-2xl">5-Day Forecast</h2>
+                        <div class="flex flex-wrap justify-center">
+                            ${data.list.map(forecast => `
+                                <div class="bg-blue-200 p-4 m-2 rounded shadow-lg  w-full sm:w-48 md:w-64">
+                                    <h3 class="text-lg">${new Date(forecast.dt_txt).toLocaleString()}</h3>
+                                    <p class="text-lg">Temp: ${forecast.main.temp}°C</p>
+                                    <p class="text-lg">Humidity: ${forecast.main.humidity}%</p>
+                                    <p class="text-lg">Weather: ${forecast.weather[0].description}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    extendedForecastDiv.innerHTML = forecastHTML;
+                })
+                .catch(error => {
+                       console.error(error);
+                       extendedForecastDiv.innerHTML = "<p>Unable to fetch extended forecast. Please try again later.</p>";
+            });
+        }
+
+
+   </script>
+    
+</body>
+</html>
